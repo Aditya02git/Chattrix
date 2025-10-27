@@ -18,7 +18,7 @@ app.use(express.json({ limit: "50mb" })); // Increase limit for video uploads
 app.use(cookieParser());
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: "https://chattrix-app-w6ph.onrender.com",
     credentials: true,
   })
 );
