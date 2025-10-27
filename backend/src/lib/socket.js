@@ -7,7 +7,7 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: ["https://chattrix-app-g8al.onrender.com"],
+    origin: ["https://chattrix-app-g8al.onrender.com"],//"http://localhost:5173" "https://chattrix-app-g8al.onrender.com"
   },
 });
 
