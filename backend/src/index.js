@@ -16,7 +16,11 @@ app.use(express.json({ limit: "50mb" }));
 app.use(cookieParser());
 app.use(
   cors({
+<<<<<<< HEAD
     origin: "https://chattrix-app-g8al.onrender.com",  // Frontend URL
+=======
+    origin: "https://chattrix-app-g8al.onrender.com",
+>>>>>>> a7f22f22882d85be4bc0dc1fa00c7eb2aa9528cf
     credentials: true,
   })
 );
