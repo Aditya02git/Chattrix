@@ -5,11 +5,11 @@ export const generateToken = (userId, res) => {
         expiresIn:"7d"
     })
 
-    res.cookie("jwt",token, {
+    res.cookie("jwt", token, {
         maxAge: 7 * 24 * 60 * 60 * 1000,
         httpOnly: true,
-        sameSite: "strict", // ✅ Changed from "strict" to "none" for cross-origin
-        secure: true // ✅ Always true when sameSite is "none"
+        sameSite: "none", // ✅ Must be "none" for cross-origin
+        secure: true // ✅ Must be true when sameSite is "none"
     });
 
     return token;
