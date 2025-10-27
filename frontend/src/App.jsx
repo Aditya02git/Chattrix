@@ -17,7 +17,7 @@ import { useSocketListeners } from "./store/useSocketListeners";
 import StatusPage from "./pages/StatusPage";
 import FriendRequestsPage from "./pages/FriendRequestsPage";
 import FriendsManagementPage from "./pages/FriendsManagementPage";
-import AddFriendPage from "./pages/AddFriendpage";
+import AddFriendPage from "./pages/AddFriendPage";
 
 const App = () => {
   const { authUser, checkAuth, isCheckingAuth, onlineUsers } = useAuthStore();
