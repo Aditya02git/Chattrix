@@ -2,8 +2,12 @@ import { create } from "zustand";
 import { axiosInstance } from "../lib/axios.js";
 import toast from "react-hot-toast";
 import { io } from "socket.io-client";
+import { useChatStore } from "./useChatStore";
 
-const BASE_URL = "https://chattrix-l0cr.onrender.com";
+const BASE_URL =
+  import.meta.env.MODE === "development" 
+    ? "http://localhost:5001" 
+    : "https://chattrix-l0cr.onrender.com";
 
 export const useAuthStore = create((set, get) => ({
   authUser: null,
@@ -32,60 +36,60 @@ export const useAuthStore = create((set, get) => ({
     }
   },
 
-signup: async (data) => {
-  set({ isSigningUp: true });
-  try {
-    const res = await axiosInstance.post("/auth/signup", data);
-    set({ authUser: res.data });
-    
-    // Save token
-    if (res.data.token) {
-      localStorage.setItem('auth-token', res.data.token);
+  signup: async (data) => {
+    set({ isSigningUp: true });
+    try {
+      const res = await axiosInstance.post("/auth/signup", data);
+      set({ authUser: res.data });
+      
+      // Save token
+      if (res.data.token) {
+        localStorage.setItem('auth-token', res.data.token);
+      }
+      
+      toast.success("Account created successfully");
+      get().connectSocket();
+    } catch (error) {
+      toast.error(error.response.data.message);
+    } finally {
+      set({ isSigningUp: false });
     }
-    
-    toast.success("Account created successfully");
-    get().connectSocket();
-  } catch (error) {
-    toast.error(error.response.data.message);
-  } finally {
-    set({ isSigningUp: false });
-  }
-},
+  },
 
-login: async (data) => {
-  set({ isLoggingIn: true });
-  try {
-    const res = await axiosInstance.post("/auth/login", data);
-    set({ authUser: res.data });
-    
-    // Save token
-    if (res.data.token) {
-      localStorage.setItem('auth-token', res.data.token);
+  login: async (data) => {
+    set({ isLoggingIn: true });
+    try {
+      const res = await axiosInstance.post("/auth/login", data);
+      set({ authUser: res.data });
+      
+      // Save token
+      if (res.data.token) {
+        localStorage.setItem('auth-token', res.data.token);
+      }
+      
+      toast.success("Logged in successfully");
+      get().connectSocket();
+    } catch (error) {
+      toast.error(error.response.data.message);
+    } finally {
+      set({ isLoggingIn: false });
     }
-    
-    toast.success("Logged in successfully");
-    get().connectSocket();
-  } catch (error) {
-    toast.error(error.response.data.message);
-  } finally {
-    set({ isLoggingIn: false });
-  }
-},
+  },
 
-logout: async () => {
-  try {
-    await axiosInstance.post("/auth/logout");
-    set({ authUser: null });
-    
-    // Remove token
-    localStorage.removeItem('auth-token');
-    
-    toast.success("Logged out successfully");
-    get().disconnectSocket();
-  } catch (error) {
-    toast.error(error.response.data.message);
-  }
-},
+  logout: async () => {
+    try {
+      await axiosInstance.post("/auth/logout");
+      set({ authUser: null });
+      
+      // Remove token
+      localStorage.removeItem('auth-token');
+      
+      toast.success("Logged out successfully");
+      get().disconnectSocket();
+    } catch (error) {
+      toast.error(error.response.data.message);
+    }
+  },
 
   updateProfile: async (data) => {
     set({ isUpdatingProfile: true });
@@ -111,6 +115,7 @@ logout: async () => {
       query: {
         userId: authUser._id,
       },
+      withCredentials: true,
     });
 
     newSocket.on("connect", () => {
@@ -123,6 +128,26 @@ logout: async () => {
 
     newSocket.on("getOnlineUsers", (userIds) => {
       set({ onlineUsers: userIds });
+    });
+
+    // Global listener for ALL new messages (for unread counts)
+    newSocket.on("newMessage", (newMessage) => {
+      const { authUser } = get();
+      const { selectedUser } = useChatStore.getState();
+      
+      // Only update unread if message is for current user and not from currently selected chat
+      if (newMessage.receiverId === authUser._id && 
+          newMessage.senderId !== selectedUser?._id) {
+        useChatStore.setState((state) => ({
+          unreadCounts: {
+            ...state.unreadCounts,
+            [newMessage.senderId]: (state.unreadCounts[newMessage.senderId] || 0) + 1,
+          },
+        }));
+        
+        // Also update the user's last message in sidebar
+        useChatStore.getState().updateUserLastMessage(newMessage);
+      }
     });
 
     set({ socket: newSocket });

@@ -225,31 +225,24 @@ export const useChatStore = create((set, get) => ({
       const isMessageSentFromSelectedUser =
         newMessage.senderId === selectedUser._id;
 
-      if (!isMessageSentFromSelectedUser) {
-        set((state) => ({
-          unreadCounts: {
-            ...state.unreadCounts,
-            [newMessage.senderId]:
-              (state.unreadCounts[newMessage.senderId] || 0) + 1,
-          },
-        }));
+      if (isMessageSentFromSelectedUser) {
+        // Message from selected user - add to messages and mark as read
+        set({
+          messages: [...get().messages, newMessage],
+        });
 
+        // Mark as read immediately since chat is open
+        get().markMessagesAsRead(selectedUser._id);
         get().updateUserLastMessage(newMessage);
-        return;
       }
-
-      set({
-        messages: [...get().messages, newMessage],
-      });
-
-      get().markMessagesAsRead(selectedUser._id);
-      get().updateUserLastMessage(newMessage);
+      // Note: Unread count updates are handled in useAuthStore's global listener
     });
 
     socket.on("messagesRead", ({ readBy, senderId }) => {
       const authUser = useAuthStore.getState().authUser;
 
       if (senderId === authUser._id) {
+        // Update messages in current chat
         set((state) => ({
           messages: state.messages.map((msg) =>
             msg.receiverId === readBy && !msg.isRead
@@ -258,6 +251,7 @@ export const useChatStore = create((set, get) => ({
           ),
         }));
 
+        // Update last message read status in users list
         set((state) => ({
           users: state.users.map((user) =>
             user._id === readBy &&
@@ -321,6 +315,7 @@ export const useChatStore = create((set, get) => ({
               video: newMessage.video,
               document: newMessage.document,
               documentName: newMessage.documentName,
+              audio: newMessage.audio,
               createdAt: newMessage.createdAt,
               senderId: newMessage.senderId,
               isRead: newMessage.isRead || false,
