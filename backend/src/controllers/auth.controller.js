@@ -29,8 +29,7 @@ export const signup = async (req, res) => {
     });
 
     if (newUser) {
-      //generate jwt token here
-      generateToken(newUser._id, res);
+      const token = generateToken(newUser._id, res);
       await newUser.save();
 
       res.status(201).json({
@@ -38,6 +37,7 @@ export const signup = async (req, res) => {
         fullName: newUser.fullName,
         email: newUser.email,
         profilePic: newUser.profilePic,
+        token: token // ✅ Return token
       });
     } else {
       res.status(400).json({ message: "Invalid user data" });
@@ -53,7 +53,7 @@ export const login = async (req, res) => {
   try {
     const user = await User.findOne({ email });
 
-    if (!user) {  // ✅ FIXED: Changed from !User to !user
+    if (!user) {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
@@ -62,13 +62,14 @@ export const login = async (req, res) => {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
-    generateToken(user._id, res);
+    const token = generateToken(user._id, res);
 
     res.status(200).json({
       _id: user._id,
       fullName: user.fullName,
       email: user.email,
       profilePic: user.profilePic,
+      token: token // ✅ Return token
     });
   } catch (error) {
     console.log("Error in login controller", error.message);
