@@ -2,12 +2,8 @@ import { create } from "zustand";
 import { axiosInstance } from "../lib/axios.js";
 import toast from "react-hot-toast";
 import { io } from "socket.io-client";
-import { useChatStore } from "./useChatStore";
 
-const BASE_URL =
-  import.meta.env.MODE === "development" 
-    ? "http://localhost:5001" 
-    : "https://chattrix-l0cr.onrender.com";
+const BASE_URL = "https://chattrix-l0cr.onrender.com";
 
 export const useAuthStore = create((set, get) => ({
   authUser: null,
@@ -27,6 +23,7 @@ export const useAuthStore = create((set, get) => ({
     } catch (error) {
       console.log("Error in checkAuth:", error);
       set({ authUser: null });
+      // Don't show toast for 401 errors during auth check
       if (error.response?.status !== 401) {
         toast.error("Authentication failed");
       }
@@ -40,11 +37,6 @@ export const useAuthStore = create((set, get) => ({
     try {
       const res = await axiosInstance.post("/auth/signup", data);
       set({ authUser: res.data });
-      
-      if (res.data.token) {
-        localStorage.setItem('auth-token', res.data.token);
-      }
-      
       toast.success("Account created successfully");
       get().connectSocket();
     } catch (error) {
@@ -59,12 +51,8 @@ export const useAuthStore = create((set, get) => ({
     try {
       const res = await axiosInstance.post("/auth/login", data);
       set({ authUser: res.data });
-      
-      if (res.data.token) {
-        localStorage.setItem('auth-token', res.data.token);
-      }
-      
       toast.success("Logged in successfully");
+
       get().connectSocket();
     } catch (error) {
       toast.error(error.response.data.message);
@@ -77,9 +65,6 @@ export const useAuthStore = create((set, get) => ({
     try {
       await axiosInstance.post("/auth/logout");
       set({ authUser: null });
-      
-      localStorage.removeItem('auth-token');
-      
       toast.success("Logged out successfully");
       get().disconnectSocket();
     } catch (error) {
@@ -104,22 +89,17 @@ export const useAuthStore = create((set, get) => ({
   connectSocket: () => {
     const { authUser, socket } = get();
 
+    // Don't connect if already connected or no auth user
     if (!authUser || socket?.connected) return;
 
     const newSocket = io(BASE_URL, {
       query: {
         userId: authUser._id,
       },
-      withCredentials: true,
     });
 
     newSocket.on("connect", () => {
       console.log("Socket connected:", newSocket.id);
-      
-      // Setup global message listener after socket connects
-      setTimeout(() => {
-        useChatStore.getState().setupGlobalMessageListener();
-      }, 100);
     });
 
     newSocket.on("connect_error", (error) => {

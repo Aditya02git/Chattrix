@@ -14,7 +14,6 @@ const Sidebar = () => {
     unreadCounts,
     getUnreadCounts,
     markMessagesAsRead,
-    setupGlobalMessageListener, // Add this
   } = useChatStore();
   const { onlineUsers, authUser } = useAuthStore();
   const [showOnlineOnly] = useState(false);
@@ -22,8 +21,7 @@ const Sidebar = () => {
   useEffect(() => {
     getUsers();
     getUnreadCounts();
-    setupGlobalMessageListener(); // Add this line
-  }, [getUsers, getUnreadCounts, setupGlobalMessageListener]);
+  }, [getUsers, getUnreadCounts]);
 
   // Handle user selection and mark messages as read
   const handleSelectUser = async (user) => {
@@ -38,6 +36,9 @@ const Sidebar = () => {
   const filteredUsers = showOnlineOnly
     ? users.filter((user) => onlineUsers.includes(user._id))
     : users;
+
+  // Calculate total unread messages
+  // const totalUnread = Object.values(unreadCounts).reduce((sum, count) => sum + count, 0);
 
   // Helper function to format time
   const formatMessageTime = (date) => {
@@ -166,6 +167,12 @@ const Sidebar = () => {
                     rounded-full ring-2 ring-zinc-900"
                   />
                 )}
+                {/* Unread badge on mobile */}
+                {/* {hasUnread && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5 ring-2 ring-zinc-900">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )} */}
               </div>
 
               {/* User info - only visible on larger screens */}

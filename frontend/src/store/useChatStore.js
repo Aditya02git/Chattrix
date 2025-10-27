@@ -127,10 +127,12 @@ export const useChatStore = create((set, get) => ({
     try {
       await axiosInstance.delete(`/messages/${messageId}`);
 
+      // Remove message from state
       set((state) => ({
         messages: state.messages.filter((msg) => msg._id !== messageId),
       }));
 
+      // Also remove from pinned if it was pinned
       set((state) => ({
         pinnedMessages: state.pinnedMessages.filter(
           (msg) => msg._id !== messageId
@@ -151,6 +153,7 @@ export const useChatStore = create((set, get) => ({
           chatUserId: selectedUser._id,
         });
 
+        // Add to pinned messages
         const message = get().messages.find((msg) => msg._id === messageId);
         if (message) {
           set((state) => ({
@@ -160,6 +163,7 @@ export const useChatStore = create((set, get) => ({
       } else {
         await axiosInstance.delete(`/messages/pin/${messageId}`);
 
+        // Remove from pinned messages
         set((state) => ({
           pinnedMessages: state.pinnedMessages.filter(
             (msg) => msg._id !== messageId
@@ -211,116 +215,100 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
-  // NEW: Setup global message listener
-  setupGlobalMessageListener: () => {
-    const socket = useAuthStore.getState().socket;
-    if (!socket) return;
+subscribeToMessages: () => {
+  const { selectedUser } = get();
+  if (!selectedUser) return;
 
-    // Remove existing listener first to avoid duplicates
-    socket.off("newMessage");
+  const socket = useAuthStore.getState().socket;
 
-    // Add global listener for all new messages
-    socket.on("newMessage", (newMessage) => {
-      const { selectedUser } = get();
-      const authUser = useAuthStore.getState().authUser;
+  socket.on("newMessage", (newMessage) => {
+    const isMessageSentFromSelectedUser =
+      newMessage.senderId === selectedUser._id;
 
-      console.log("New message received:", newMessage); // Debug log
-
-      // Check if message is for current user
-      if (newMessage.receiverId === authUser._id) {
-        const isFromSelectedUser = newMessage.senderId === selectedUser?._id;
-
-        if (isFromSelectedUser) {
-          // Add to current chat messages
-          set((state) => ({
-            messages: [...state.messages, newMessage],
-          }));
-
-          // Mark as read since chat is open
-          get().markMessagesAsRead(selectedUser._id);
-        } else {
-          // Increment unread count for other users
-          set((state) => ({
-            unreadCounts: {
-              ...state.unreadCounts,
-              [newMessage.senderId]: (state.unreadCounts[newMessage.senderId] || 0) + 1,
-            },
-          }));
-        }
-
-        // Update last message in sidebar
-        get().updateUserLastMessage(newMessage);
-      }
-    });
-  },
-
-  subscribeToMessages: () => {
-    const { selectedUser } = get();
-    if (!selectedUser) return;
-
-    const socket = useAuthStore.getState().socket;
-    if (!socket) return;
-
-    socket.on("messagesRead", ({ readBy, senderId }) => {
-      const authUser = useAuthStore.getState().authUser;
-
-      if (senderId === authUser._id) {
-        set((state) => ({
-          messages: state.messages.map((msg) =>
-            msg.receiverId === readBy && !msg.isRead
-              ? { ...msg, isRead: true, readAt: new Date() }
-              : msg
-          ),
-        }));
-
-        set((state) => ({
-          users: state.users.map((user) =>
-            user._id === readBy &&
-            user.lastMessage &&
-            user.lastMessage.senderId === authUser._id
-              ? {
-                  ...user,
-                  lastMessage: { ...user.lastMessage, isRead: true },
-                }
-              : user
-          ),
-        }));
-      }
-    });
-
-    socket.on("messageDeleted", ({ messageId }) => {
+    if (!isMessageSentFromSelectedUser) {
+      // Increment unread count for sender
       set((state) => ({
-        messages: state.messages.filter((msg) => msg._id !== messageId),
-        pinnedMessages: state.pinnedMessages.filter(
-          (msg) => msg._id !== messageId
+        unreadCounts: {
+          ...state.unreadCounts,
+          [newMessage.senderId]:
+            (state.unreadCounts[newMessage.senderId] || 0) + 1,
+        },
+      }));
+
+      get().updateUserLastMessage(newMessage);
+      return;
+    }
+
+    // Message from selected user - add to messages
+    set({
+      messages: [...get().messages, newMessage],
+    });
+
+    // Mark as read immediately since chat is open
+    get().markMessagesAsRead(selectedUser._id);
+    get().updateUserLastMessage(newMessage);
+  });
+
+  socket.on("messagesRead", ({ readBy, senderId }) => {
+    const authUser = useAuthStore.getState().authUser;
+
+    if (senderId === authUser._id) {
+      // Update messages in current chat
+      set((state) => ({
+        messages: state.messages.map((msg) =>
+          msg.receiverId === readBy && !msg.isRead
+            ? { ...msg, isRead: true, readAt: new Date() }
+            : msg
         ),
       }));
-    });
 
-    socket.on("messagePinned", ({ message }) => {
+      // Update last message read status in users list
       set((state) => ({
-        pinnedMessages: [...state.pinnedMessages, message],
-      }));
-    });
-
-    socket.on("messageUnpinned", ({ messageId }) => {
-      set((state) => ({
-        pinnedMessages: state.pinnedMessages.filter(
-          (msg) => msg._id !== messageId
+        users: state.users.map((user) =>
+          user._id === readBy &&
+          user.lastMessage &&
+          user.lastMessage.senderId === authUser._id
+            ? {
+                ...user,
+                lastMessage: { ...user.lastMessage, isRead: true },
+              }
+            : user
         ),
       }));
-    });
-  },
+    }
+  });
+
+  socket.on("messageDeleted", ({ messageId }) => {
+    set((state) => ({
+      messages: state.messages.filter((msg) => msg._id !== messageId),
+      pinnedMessages: state.pinnedMessages.filter(
+        (msg) => msg._id !== messageId
+      ),
+    }));
+  });
+
+  socket.on("messagePinned", ({ message }) => {
+    set((state) => ({
+      pinnedMessages: [...state.pinnedMessages, message],
+    }));
+  });
+
+  socket.on("messageUnpinned", ({ messageId }) => {
+    set((state) => ({
+      pinnedMessages: state.pinnedMessages.filter(
+        (msg) => msg._id !== messageId
+      ),
+    }));
+  });
+},
 
   unsubscribeFromMessages: () => {
     const socket = useAuthStore.getState().socket;
-    if (!socket) return;
-    
+    socket.off("newMessage");
     socket.off("messagesRead");
     socket.off("messageDeleted");
     socket.off("messagePinned");
     socket.off("messageUnpinned");
-    // Don't unsubscribe from newMessage as it's global
   },
 
   updateUserLastMessage: (newMessage) => {
@@ -338,7 +326,6 @@ export const useChatStore = create((set, get) => ({
               video: newMessage.video,
               document: newMessage.document,
               documentName: newMessage.documentName,
-              audio: newMessage.audio,
               createdAt: newMessage.createdAt,
               senderId: newMessage.senderId,
               isRead: newMessage.isRead || false,
