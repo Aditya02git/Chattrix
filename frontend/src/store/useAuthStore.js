@@ -130,22 +130,37 @@ export const useAuthStore = create((set, get) => ({
       set({ onlineUsers: userIds });
     });
 
-    // Global listener for ALL new messages (for unread counts)
+    // Global listener for ALL new messages (for unread counts and sidebar updates)
     newSocket.on("newMessage", (newMessage) => {
       const { authUser } = get();
       const { selectedUser } = useChatStore.getState();
       
-      // Only update unread if message is for current user and not from currently selected chat
+      console.log("New message received:", {
+        from: newMessage.senderId,
+        to: newMessage.receiverId,
+        currentUser: authUser._id,
+        selectedUser: selectedUser?._id
+      });
+      
+      // Only update unread if:
+      // 1. Message is received by current user (not sent by them)
+      // 2. Chat with sender is not currently open
       if (newMessage.receiverId === authUser._id && 
-          newMessage.senderId !== selectedUser?._id) {
+          selectedUser?._id !== newMessage.senderId) {
+        
+        console.log("Incrementing unread count for:", newMessage.senderId);
+        
         useChatStore.setState((state) => ({
           unreadCounts: {
             ...state.unreadCounts,
             [newMessage.senderId]: (state.unreadCounts[newMessage.senderId] || 0) + 1,
           },
         }));
-        
-        // Also update the user's last message in sidebar
+      }
+      
+      // IMPORTANT: Always update last message in sidebar for both sender and receiver
+      // This keeps the sidebar in sync regardless of who sent the message
+      if (newMessage.receiverId === authUser._id || newMessage.senderId === authUser._id) {
         useChatStore.getState().updateUserLastMessage(newMessage);
       }
     });

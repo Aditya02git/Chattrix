@@ -215,6 +215,19 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
+  // NEW: Update unread count for a specific user
+  updateUnreadCount: (userId, increment = true) => {
+    set((state) => {
+      const newUnreadCounts = { ...state.unreadCounts };
+      if (increment) {
+        newUnreadCounts[userId] = (newUnreadCounts[userId] || 0) + 1;
+      } else {
+        delete newUnreadCounts[userId];
+      }
+      return { unreadCounts: newUnreadCounts };
+    });
+  },
+
   subscribeToMessages: () => {
     const { selectedUser } = get();
     if (!selectedUser) return;
@@ -222,9 +235,11 @@ export const useChatStore = create((set, get) => ({
     const socket = useAuthStore.getState().socket;
 
     socket.on("newMessage", (newMessage) => {
-      const isMessageSentFromSelectedUser =
-        newMessage.senderId === selectedUser._id;
+      const authUser = useAuthStore.getState().authUser;
+      const isMessageSentFromSelectedUser = newMessage.senderId === selectedUser._id;
+      const isMessageSentToSelectedUser = newMessage.receiverId === selectedUser._id;
 
+      // Handle incoming messages from the selected user
       if (isMessageSentFromSelectedUser) {
         // Message from selected user - add to messages and mark as read
         set({
@@ -233,7 +248,14 @@ export const useChatStore = create((set, get) => ({
 
         // Mark as read immediately since chat is open
         get().markMessagesAsRead(selectedUser._id);
-        get().updateUserLastMessage(newMessage);
+      }
+      
+      // Handle outgoing messages to the selected user (show in chat immediately)
+      if (isMessageSentToSelectedUser && newMessage.senderId === authUser._id) {
+        // This is our own message to the selected user, add it to the chat
+        set({
+          messages: [...get().messages, newMessage],
+        });
       }
       // Note: Unread count updates are handled in useAuthStore's global listener
     });
