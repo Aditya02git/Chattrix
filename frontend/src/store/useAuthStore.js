@@ -106,11 +106,18 @@ export const useAuthStore = create((set, get) => ({
 
     if (!authUser || socket?.connected) return;
 
+    console.log("🔌 Attempting to connect socket to:", BASE_URL);
+    console.log("User ID:", authUser._id);
+
     const newSocket = io(BASE_URL, {
       query: {
         userId: authUser._id,
       },
       withCredentials: true,
+      transports: ['websocket', 'polling'], // Try websocket first, fallback to polling
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
     });
 
     newSocket.on("connect", () => {
