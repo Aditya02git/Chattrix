@@ -127,12 +127,10 @@ export const useChatStore = create((set, get) => ({
     try {
       await axiosInstance.delete(`/messages/${messageId}`);
 
-      // Remove message from state
       set((state) => ({
         messages: state.messages.filter((msg) => msg._id !== messageId),
       }));
 
-      // Also remove from pinned if it was pinned
       set((state) => ({
         pinnedMessages: state.pinnedMessages.filter(
           (msg) => msg._id !== messageId
@@ -153,7 +151,6 @@ export const useChatStore = create((set, get) => ({
           chatUserId: selectedUser._id,
         });
 
-        // Add to pinned messages
         const message = get().messages.find((msg) => msg._id === messageId);
         if (message) {
           set((state) => ({
@@ -163,7 +160,6 @@ export const useChatStore = create((set, get) => ({
       } else {
         await axiosInstance.delete(`/messages/pin/${messageId}`);
 
-        // Remove from pinned messages
         set((state) => ({
           pinnedMessages: state.pinnedMessages.filter(
             (msg) => msg._id !== messageId
@@ -215,34 +211,60 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
+  // NEW: Setup global message listener
+  setupGlobalMessageListener: () => {
+    const socket = useAuthStore.getState().socket;
+    if (!socket) return;
+
+    // Remove existing listener first to avoid duplicates
+    socket.off("newMessage");
+
+    // Add global listener for all new messages
+    socket.on("newMessage", (newMessage) => {
+      const { selectedUser } = get();
+      const authUser = useAuthStore.getState().authUser;
+
+      console.log("New message received:", newMessage); // Debug log
+
+      // Check if message is for current user
+      if (newMessage.receiverId === authUser._id) {
+        const isFromSelectedUser = newMessage.senderId === selectedUser?._id;
+
+        if (isFromSelectedUser) {
+          // Add to current chat messages
+          set((state) => ({
+            messages: [...state.messages, newMessage],
+          }));
+
+          // Mark as read since chat is open
+          get().markMessagesAsRead(selectedUser._id);
+        } else {
+          // Increment unread count for other users
+          set((state) => ({
+            unreadCounts: {
+              ...state.unreadCounts,
+              [newMessage.senderId]: (state.unreadCounts[newMessage.senderId] || 0) + 1,
+            },
+          }));
+        }
+
+        // Update last message in sidebar
+        get().updateUserLastMessage(newMessage);
+      }
+    });
+  },
+
   subscribeToMessages: () => {
     const { selectedUser } = get();
     if (!selectedUser) return;
 
     const socket = useAuthStore.getState().socket;
-
-    socket.on("newMessage", (newMessage) => {
-      const isMessageSentFromSelectedUser =
-        newMessage.senderId === selectedUser._id;
-
-      if (isMessageSentFromSelectedUser) {
-        // Message from selected user - add to messages and mark as read
-        set({
-          messages: [...get().messages, newMessage],
-        });
-
-        // Mark as read immediately since chat is open
-        get().markMessagesAsRead(selectedUser._id);
-        get().updateUserLastMessage(newMessage);
-      }
-      // Note: Unread count updates are handled in useAuthStore's global listener
-    });
+    if (!socket) return;
 
     socket.on("messagesRead", ({ readBy, senderId }) => {
       const authUser = useAuthStore.getState().authUser;
 
       if (senderId === authUser._id) {
-        // Update messages in current chat
         set((state) => ({
           messages: state.messages.map((msg) =>
             msg.receiverId === readBy && !msg.isRead
@@ -251,7 +273,6 @@ export const useChatStore = create((set, get) => ({
           ),
         }));
 
-        // Update last message read status in users list
         set((state) => ({
           users: state.users.map((user) =>
             user._id === readBy &&
@@ -293,11 +314,13 @@ export const useChatStore = create((set, get) => ({
 
   unsubscribeFromMessages: () => {
     const socket = useAuthStore.getState().socket;
-    socket.off("newMessage");
+    if (!socket) return;
+    
     socket.off("messagesRead");
     socket.off("messageDeleted");
     socket.off("messagePinned");
     socket.off("messageUnpinned");
+    // Don't unsubscribe from newMessage as it's global
   },
 
   updateUserLastMessage: (newMessage) => {
