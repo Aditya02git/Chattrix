@@ -27,7 +27,6 @@ export const useAuthStore = create((set, get) => ({
     } catch (error) {
       console.log("Error in checkAuth:", error);
       set({ authUser: null });
-      // Don't show toast for 401 errors during auth check
       if (error.response?.status !== 401) {
         toast.error("Authentication failed");
       }
@@ -42,7 +41,6 @@ export const useAuthStore = create((set, get) => ({
       const res = await axiosInstance.post("/auth/signup", data);
       set({ authUser: res.data });
       
-      // Save token
       if (res.data.token) {
         localStorage.setItem('auth-token', res.data.token);
       }
@@ -62,7 +60,6 @@ export const useAuthStore = create((set, get) => ({
       const res = await axiosInstance.post("/auth/login", data);
       set({ authUser: res.data });
       
-      // Save token
       if (res.data.token) {
         localStorage.setItem('auth-token', res.data.token);
       }
@@ -81,7 +78,6 @@ export const useAuthStore = create((set, get) => ({
       await axiosInstance.post("/auth/logout");
       set({ authUser: null });
       
-      // Remove token
       localStorage.removeItem('auth-token');
       
       toast.success("Logged out successfully");
@@ -108,7 +104,6 @@ export const useAuthStore = create((set, get) => ({
   connectSocket: () => {
     const { authUser, socket } = get();
 
-    // Don't connect if already connected or no auth user
     if (!authUser || socket?.connected) return;
 
     const newSocket = io(BASE_URL, {
@@ -130,25 +125,44 @@ export const useAuthStore = create((set, get) => ({
       set({ onlineUsers: userIds });
     });
 
-    // Global listener for ALL new messages (for unread counts)
+    // CRITICAL: Global listener for unread counts
     newSocket.on("newMessage", (newMessage) => {
-      const { authUser } = get();
-      const { selectedUser } = useChatStore.getState();
+      console.log("📩 Global newMessage received:", newMessage);
       
-      // Only update unread if message is for current user and not from currently selected chat
-      if (newMessage.receiverId === authUser._id && 
-          selectedUser?._id !== newMessage.senderId) {
+      const currentAuthUser = get().authUser;
+      const chatStore = useChatStore.getState();
+      
+      console.log("Current user:", currentAuthUser._id);
+      console.log("Selected user:", chatStore.selectedUser?._id);
+      console.log("Message sender:", newMessage.senderId);
+      console.log("Message receiver:", newMessage.receiverId);
+      
+      // Update sidebar last message for everyone
+      chatStore.updateUserLastMessage(newMessage);
+      
+      // Increment unread count ONLY if:
+      // 1. I'm the receiver
+      // 2. The sender's chat is NOT currently open
+      const shouldIncrementUnread = 
+        newMessage.receiverId === currentAuthUser._id && 
+        chatStore.selectedUser?._id !== newMessage.senderId;
+      
+      console.log("Should increment unread?", shouldIncrementUnread);
+      
+      if (shouldIncrementUnread) {
+        const currentCount = chatStore.unreadCounts[newMessage.senderId] || 0;
+        console.log("Current unread count:", currentCount);
+        console.log("New unread count:", currentCount + 1);
         
-        useChatStore.setState((state) => ({
-          unreadCounts: {
+        useChatStore.setState((state) => {
+          const newCounts = {
             ...state.unreadCounts,
-            [newMessage.senderId]: (state.unreadCounts[newMessage.senderId] || 0) + 1,
-          },
-        }));
+            [newMessage.senderId]: currentCount + 1,
+          };
+          console.log("Updated unreadCounts:", newCounts);
+          return { unreadCounts: newCounts };
+        });
       }
-      
-      // Always update the user's last message in sidebar
-      useChatStore.getState().updateUserLastMessage(newMessage);
     });
 
     set({ socket: newSocket });
