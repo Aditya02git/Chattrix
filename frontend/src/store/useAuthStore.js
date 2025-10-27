@@ -4,7 +4,9 @@ import toast from "react-hot-toast";
 import { io } from "socket.io-client";
 
 const BASE_URL =
-  import.meta.env.MODE === "development" ? "http://localhost:5001" : "/";
+  import.meta.env.MODE === "development" 
+    ? "http://localhost:5001" 
+    : "https://chattrix-l0cr.onrender.com"; // ✅ Changed from "/" to your backend URL
 
 export const useAuthStore = create((set, get) => ({
   authUser: null,
@@ -97,6 +99,7 @@ export const useAuthStore = create((set, get) => ({
       query: {
         userId: authUser._id,
       },
+      withCredentials: true, // ✅ Add this for cross-origin cookies
     });
 
     newSocket.on("connect", () => {
