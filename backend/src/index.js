@@ -19,7 +19,7 @@ app.use(express.json({ limit: "50mb" }));
 app.use(cookieParser());
 app.use(
   cors({
-    origin: "https://chattrix-6vwq.vercel.app/",
+    origin: "https://chattrix-6vwq-git-main-aditya-c1b8.vercel.app/",
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization'],
     exposedHeaders: ['set-cookie']
