@@ -19,7 +19,7 @@ app.use(express.json({ limit: "50mb" }));
 app.use(cookieParser());
 app.use(
   cors({
-    origin: "https://chattrix-app-g8al.onrender.com",
+    origin: "https://chattrix-6vwq.vercel.app/",
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization'],
     exposedHeaders: ['set-cookie']
