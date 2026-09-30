@@ -7,7 +7,7 @@ import { useChatStore } from "./useChatStore";
 const BASE_URL =
   import.meta.env.MODE === "development" 
     ? "http://localhost:5001" 
-    : "https://chattrix-dun.vercel.app/";
+    : "https://chattrix-dun.vercel.app";
 
 export const useAuthStore = create((set, get) => ({
   authUser: null,
