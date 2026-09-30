@@ -7,7 +7,7 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: ["https://chattrix-6vwq-git-main-aditya-c1b8.vercel.app/"], // ✅ Your frontend URL
+    origin: ["https://chattrix-6vwq-git-main-aditya-c1b8.vercel.app"], // ✅ Your frontend URL
   },
 });
 
